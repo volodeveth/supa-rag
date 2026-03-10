@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient();
     const { data: chunks, error } = await supabase.rpc("match_documents", {
       query_embedding: queryEmbedding,
-      match_threshold: 0.5,
+      match_threshold: 0.3,
       match_count: 5,
     });
 
