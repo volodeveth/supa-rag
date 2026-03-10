@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { generateQueryEmbedding } from "@/lib/embeddings";
-import { buildMessages, generateAnswer } from "@/lib/llm";
+import { buildMessages, generateAnswerStream } from "@/lib/llm";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,23 +42,52 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Generate answer using DeepSeek V3
-    const messages = buildMessages(query.trim(), chunks);
-    const answer = await generateAnswer(messages);
+    // 4. Build sources metadata to prepend
+    const sources = chunks.map(
+      (c: {
+        content: string;
+        similarity: number;
+        metadata: Record<string, unknown>;
+      }) => ({
+        content: c.content.slice(0, 200) + "...",
+        similarity: c.similarity,
+        metadata: c.metadata,
+      })
+    );
 
-    return NextResponse.json({
-      answer,
-      sources: chunks.map(
-        (c: {
-          content: string;
-          similarity: number;
-          metadata: Record<string, unknown>;
-        }) => ({
-          content: c.content.slice(0, 200) + "...",
-          similarity: c.similarity,
-          metadata: c.metadata,
-        })
-      ),
+    // 5. Stream the LLM response
+    const messages = buildMessages(query.trim(), chunks);
+    const llmStream = await generateAnswerStream(messages);
+
+    // Prepend sources as a JSON line, then stream LLM tokens
+    const encoder = new TextEncoder();
+    const sourcesChunk = encoder.encode(
+      `data: ${JSON.stringify({ sources })}\n\n`
+    );
+
+    const outputStream = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(sourcesChunk);
+        const reader = llmStream.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = new TextDecoder().decode(value);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ token: text })}\n\n`)
+          );
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+
+    return new Response(outputStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   } catch (err) {
     console.error("Chat API error:", err);

@@ -33,7 +33,7 @@ export function buildMessages(
   ];
 }
 
-export async function generateAnswer(messages: Message[]): Promise<string> {
+export async function generateAnswerStream(messages: Message[]): Promise<ReadableStream> {
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
@@ -48,6 +48,7 @@ export async function generateAnswer(messages: Message[]): Promise<string> {
         temperature: 0.1,
         top_p: 0.9,
         max_tokens: 1000,
+        stream: true,
       }),
     }
   );
@@ -59,6 +60,36 @@ export async function generateAnswer(messages: Message[]): Promise<string> {
     );
   }
 
-  const data = await response.json();
-  return data.choices[0].message.content;
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+
+  return new ReadableStream({
+    async pull(controller) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+        for (const line of lines) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            controller.close();
+            return;
+          }
+          try {
+            const json = JSON.parse(data);
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(content));
+            }
+          } catch {
+            // skip malformed chunks
+          }
+        }
+      }
+    },
+  });
 }

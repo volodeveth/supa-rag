@@ -2,14 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 
+interface Source {
+  content: string;
+  similarity: number;
+  metadata: Record<string, unknown>;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
-  sources?: Array<{
-    content: string;
-    similarity: number;
-    metadata: Record<string, unknown>;
-  }>;
+  sources?: Source[];
 }
 
 export default function Chat() {
@@ -38,9 +40,20 @@ export default function Chat() {
         body: JSON.stringify({ query }),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const data = await res.json();
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Error: ${data.error}` },
+        ]);
+        return;
+      }
 
-      if (res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+
+      // Non-streaming response (e.g. no results found)
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
         setMessages((prev) => [
           ...prev,
           {
@@ -49,11 +62,62 @@ export default function Chat() {
             sources: data.sources,
           },
         ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${data.error}` },
-        ]);
+        return;
+      }
+
+      // Streaming response
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let sources: Source[] = [];
+      let buffer = "";
+
+      // Add empty assistant message to fill in
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "", sources: [] },
+      ]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") break;
+
+          try {
+            const json = JSON.parse(data);
+            if (json.sources) {
+              sources = json.sources;
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  sources,
+                };
+                return updated;
+              });
+            }
+            if (json.token) {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: last.content + json.token,
+                };
+                return updated;
+              });
+            }
+          } catch {
+            // skip malformed
+          }
+        }
       }
     } catch {
       setMessages((prev) => [
@@ -127,7 +191,7 @@ export default function Chat() {
           </div>
         ))}
 
-        {loading && (
+        {loading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
             <div className="bg-gray-100 rounded-2xl px-4 py-3 text-gray-500">
               Thinking...
