@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 
 interface Source {
   content: string;
-  similarity: number;
+  relevance: number;
   metadata: Record<string, unknown>;
 }
 
@@ -179,7 +179,7 @@ export default function Chat() {
                         className="bg-white border border-gray-200 rounded-lg p-2"
                       >
                         <span className="font-mono text-gray-400">
-                          similarity: {src.similarity.toFixed(3)}
+                          relevance: {src.relevance.toFixed(3)}
                         </span>
                         <p className="text-gray-600 mt-1">{src.content}</p>
                       </div>
