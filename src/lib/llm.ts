@@ -15,12 +15,12 @@ Rules:
 
 export function buildMessages(
   query: string,
-  contextChunks: Array<{ content: string; similarity: number; metadata: Record<string, unknown> }>
+  contextChunks: Array<{ content: string; relevance_score: number; metadata: Record<string, unknown> }>
 ): Message[] {
   const context = contextChunks
     .map(
       (chunk, i) =>
-        `[Chunk ${i + 1}] (similarity: ${chunk.similarity.toFixed(3)})\n${chunk.content}`
+        `[Chunk ${i + 1}] (relevance: ${chunk.relevance_score.toFixed(3)})\n${chunk.content}`
     )
     .join("\n\n---\n\n");
 

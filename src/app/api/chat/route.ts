@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { generateQueryEmbedding } from "@/lib/embeddings";
 import { buildMessages, generateAnswerStream } from "@/lib/llm";
+import { rerankChunks } from "@/lib/reranker";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,15 +15,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Generate embedding for the query
-    const queryEmbedding = await generateQueryEmbedding(query.trim());
+    const trimmedQuery = query.trim();
 
-    // 2. Search similar documents in Supabase
+    // 1. Generate embedding for the query
+    const queryEmbedding = await generateQueryEmbedding(trimmedQuery);
+
+    // 2. Hybrid search: vector + full-text with RRF
     const supabase = createServiceClient();
-    const { data: chunks, error } = await supabase.rpc("match_documents", {
+    const { data: hybridChunks, error } = await supabase.rpc("hybrid_search", {
+      query_text: trimmedQuery,
       query_embedding: queryEmbedding,
-      match_threshold: 0.1,
-      match_count: 5,
+      match_count: 20,
     });
 
     if (error) {
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. If no relevant chunks found
-    if (!chunks || chunks.length === 0) {
+    if (!hybridChunks || hybridChunks.length === 0) {
       return NextResponse.json({
         answer:
           "I don't have relevant information in the documents to answer this question.",
@@ -42,24 +45,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Build sources metadata to prepend
-    const sources = chunks.map(
-      (c: {
-        content: string;
-        similarity: number;
-        metadata: Record<string, unknown>;
-      }) => ({
-        content: c.content.slice(0, 200) + "...",
-        similarity: c.similarity,
-        metadata: c.metadata,
-      })
-    );
+    // 4. Rerank top 20 → top 5
+    const rerankedChunks = await rerankChunks(trimmedQuery, hybridChunks, 5);
 
-    // 5. Stream the LLM response
-    const messages = buildMessages(query.trim(), chunks);
+    // 5. Build sources metadata
+    const sources = rerankedChunks.map((c) => ({
+      content: c.content.slice(0, 200) + "...",
+      relevance: c.relevance_score,
+      metadata: c.metadata,
+    }));
+
+    // 6. Stream the LLM response
+    const messages = buildMessages(trimmedQuery, rerankedChunks);
     const llmStream = await generateAnswerStream(messages);
 
-    // Prepend sources as a JSON line, then stream LLM tokens
     const encoder = new TextEncoder();
     const sourcesChunk = encoder.encode(
       `data: ${JSON.stringify({ sources })}\n\n`
