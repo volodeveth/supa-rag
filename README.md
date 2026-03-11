@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RAG Chat
 
-## Getting Started
+A Retrieval-Augmented Generation chatbot built with Next.js and Supabase. Ingests PDF/text documents and answers questions using hybrid search with streaming responses.
 
-First, run the development server:
+## How It Works
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1. **Document ingestion** — splits text into chunks, generates vector embeddings via Jina Embeddings v3, and stores them in Supabase (pgvector)
+2. **Hybrid search** — combines vector similarity search with full-text search (BM25) using Reciprocal Rank Fusion
+3. **Reranking** — Jina Reranker v3 scores and filters the top results
+4. **Answer generation** — DeepSeek Chat (via OpenRouter) generates a streamed response grounded in the retrieved context
+
+## Tech Stack
+
+- **Frontend**: React 19, Next.js 16, Tailwind CSS v4
+- **Database**: Supabase (PostgreSQL + pgvector + GIN full-text index)
+- **Embeddings**: Jina Embeddings v3 (1024 dimensions)
+- **Reranking**: Jina Reranker v3
+- **LLM**: DeepSeek Chat via OpenRouter
+
+## Setup
+
+### Prerequisites
+
+- Node.js 18+
+- Supabase project with pgvector extension enabled
+- API keys: Jina AI, OpenRouter
+
+### Environment Variables
+
+Create `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+JINA_API_KEY=<your-jina-api-key>
+OPENROUTER_API_KEY=<your-openrouter-api-key>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Install & Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Apply database migrations
+npx supabase db push
 
-## Learn More
+# Ingest a document
+node scripts/ingest-pdf.mjs <path-to-file>
 
-To learn more about Next.js, take a look at the following resources:
+# Start dev server
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/
+│   ├── api/chat/route.ts   # Chat endpoint (search → rerank → stream)
+│   └── page.tsx             # Home page
+├── components/
+│   └── Chat.tsx             # Chat UI
+└── lib/
+    ├── embeddings.ts        # Jina embeddings
+    ├── llm.ts               # LLM streaming & prompt
+    ├── reranker.ts          # Jina reranker
+    ├── chunker.ts           # Text chunking
+    └── supabase.ts          # Supabase client
+scripts/
+└── ingest-pdf.mjs           # Document ingestion
+supabase/
+└── migrations/               # Database schema & RPC functions
+```
