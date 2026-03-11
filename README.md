@@ -2,6 +2,8 @@
 
 A Retrieval-Augmented Generation chatbot built with Next.js and Supabase. Ingests PDF/text documents and answers questions using hybrid search with streaming responses.
 
+**Live demo:** [ask-about-dorosh-rag-chat.vercel.app](https://ask-about-dorosh-rag-chat.vercel.app/)
+
 ## How It Works
 
 1. **Document ingestion** — splits text into chunks, generates vector embeddings via Jina Embeddings v3, and stores them in Supabase (pgvector)
