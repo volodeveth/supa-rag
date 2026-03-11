@@ -134,10 +134,10 @@ export default function Chat() {
       {/* Header */}
       <header className="border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-semibold text-gray-900">
-          RAG Chat — Supabase pgvector
+          Ask About Dorosh
         </h1>
         <p className="text-sm text-gray-500">
-          Ask questions about the ingested PDF document
+          Production RAG pipeline powered by DeepSeek, Jina AI &amp; Supabase pgvector
         </p>
       </header>
 
