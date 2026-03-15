@@ -56,6 +56,22 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Deploy to AWS EC2
+
+See [docs/aws-migration.md](docs/aws-migration.md) for full deployment guide.
+
+Quick deploy:
+
+```bash
+# 1. Setup EC2 instance (run on server)
+sudo bash scripts/ec2-setup.sh
+
+# 2. Deploy from local machine
+bash scripts/deploy.sh ubuntu@<elastic-ip> ~/.ssh/your-key.pem
+```
+
+Or push to `master` for automatic deployment via GitHub Actions.
+
 ## Project Structure
 
 ```

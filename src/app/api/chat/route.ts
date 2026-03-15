@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const { data: hybridChunks, error } = await supabase.rpc("hybrid_search", {
       query_text: trimmedQuery,
       query_embedding: queryEmbedding,
-      match_count: 20,
+      match_count: 40,
     });
 
     if (error) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Rerank top 20 → top 5
-    const rerankedChunks = await rerankChunks(trimmedQuery, hybridChunks, 5);
+    const rerankedChunks = await rerankChunks(trimmedQuery, hybridChunks, 10);
 
     // 5. Build sources metadata
     const sources = rerankedChunks.map((c) => ({

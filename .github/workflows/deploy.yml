@@ -1,0 +1,55 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Prepare standalone package
+        run: |
+          mkdir -p deploy/.next
+          cp -r .next/standalone/* deploy/
+          cp -r .next/standalone/.next/* deploy/.next/
+          cp -r .next/static deploy/.next/static
+          cp -r public deploy/public 2>/dev/null || true
+          cp ecosystem.config.js deploy/
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2-key.pem
+          chmod 600 ~/.ssh/ec2-key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "cd ~/rag-chat && cp .env.production /tmp/.env.production.bak 2>/dev/null; rm -rf .next node_modules public server.js package.json ecosystem.config.js"
+          scp -r -i ~/.ssh/ec2-key.pem deploy/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/rag-chat/
+          scp -r -i ~/.ssh/ec2-key.pem deploy/.next ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/rag-chat/
+          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "cp /tmp/.env.production.bak ~/rag-chat/.env.production 2>/dev/null"
+
+      - name: Restart PM2
+        run: |
+          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "cd ~/rag-chat && pm2 delete rag-chat 2>/dev/null; pm2 start ecosystem.config.js"

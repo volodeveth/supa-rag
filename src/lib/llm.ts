@@ -3,15 +3,16 @@ interface Message {
   content: string;
 }
 
-const SYSTEM_PROMPT = `You are a precise assistant that answers questions ONLY based on the provided context.
+const SYSTEM_PROMPT = `You are a helpful assistant for Volodymyr Dorosh's portfolio. You answer questions about his projects, skills, experience, and source code based ONLY on the provided context.
 
 Rules:
 1. Answer ONLY using information from the context below
 2. If the context doesn't contain the answer, say "I don't have this information in the documents"
-3. Quote relevant parts of the context to support your answer
+3. When showing code, use markdown code blocks with the appropriate language tag
 4. Never make assumptions or add information not in the context
 5. If partially relevant, clearly state what you know and what you don't
-6. Always end with a "Sources:" section listing which context chunks you used`;
+6. Respond in the same language the user asks in (Ukrainian, English, etc.)
+7. The context may contain source code from Volodymyr's projects — present it clearly when asked`;
 
 export function buildMessages(
   query: string,
@@ -47,7 +48,7 @@ export async function generateAnswerStream(messages: Message[]): Promise<Readabl
         messages,
         temperature: 0.1,
         top_p: 0.9,
-        max_tokens: 1000,
+        max_tokens: 3000,
         stream: true,
       }),
     }
