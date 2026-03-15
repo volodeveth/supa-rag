@@ -33,23 +33,25 @@ jobs:
           cp -r public deploy/public 2>/dev/null || true
           cp ecosystem.config.js deploy/
 
-      - name: Setup SSH key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2-key.pem
           chmod 600 ~/.ssh/ec2-key.pem
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOL
+          Host ec2
+            HostName ${{ secrets.EC2_HOST }}
+            User ${{ secrets.EC2_USER }}
+            IdentityFile ~/.ssh/ec2-key.pem
+            StrictHostKeyChecking no
+          EOL
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "cd ~/rag-chat && cp .env.production /tmp/.env.production.bak 2>/dev/null; rm -rf .next node_modules public server.js package.json ecosystem.config.js"
-          scp -r -i ~/.ssh/ec2-key.pem deploy/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/rag-chat/
-          scp -r -i ~/.ssh/ec2-key.pem deploy/.next ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/rag-chat/
-          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "cp /tmp/.env.production.bak ~/rag-chat/.env.production 2>/dev/null"
+          ssh ec2 "cd ~/rag-chat && cp .env.production /tmp/.env.production.bak 2>/dev/null; rm -rf .next node_modules public server.js package.json ecosystem.config.js"
+          scp -r deploy/* ec2:~/rag-chat/
+          scp -r deploy/.next ec2:~/rag-chat/
+          ssh ec2 "cp /tmp/.env.production.bak ~/rag-chat/.env.production 2>/dev/null"
 
       - name: Restart PM2
-        run: |
-          ssh -i ~/.ssh/ec2-key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "cd ~/rag-chat && pm2 delete rag-chat 2>/dev/null; pm2 start ecosystem.config.js"
+        run: ssh ec2 "cd ~/rag-chat && pm2 delete rag-chat 2>/dev/null; pm2 start ecosystem.config.js"
