@@ -38,61 +38,44 @@ const STACK = {
 };
 
 function TechPanel() {
-  const [open, setOpen] = useState(false);
-
   return (
-    <div className="border-t border-gray-100 bg-gray-50/50">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full px-5 py-2.5 flex items-center justify-between text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors cursor-pointer uppercase tracking-wider"
-      >
-        <span>How this RAG works</span>
-        <svg
-          className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+    <div className="border-t border-gray-100 bg-gray-50/50 px-5 py-3 space-y-3">
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">How this RAG works</h2>
 
-      {open && (
-        <div className="px-5 pb-4 space-y-4">
-          {/* Pipeline */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            {PIPELINE_STEPS.map((step, i, arr) => (
-              <span key={step} className="flex items-center gap-1.5">
-                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium whitespace-nowrap">
-                  {step}
-                </span>
-                {i < arr.length - 1 && <span className="text-gray-300">→</span>}
-              </span>
-            ))}
-          </div>
+      {/* Pipeline */}
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {PIPELINE_STEPS.map((step, i, arr) => (
+          <span key={step} className="flex items-center gap-1.5">
+            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium whitespace-nowrap">
+              {step}
+            </span>
+            {i < arr.length - 1 && <span className="text-gray-300">→</span>}
+          </span>
+        ))}
+      </div>
 
-          {/* Stack */}
-          <div className="grid grid-cols-3 gap-3">
-            {Object.entries(STACK).map(([title, items]) => (
-              <div key={title}>
-                <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{title}</h4>
-                <ul className="text-xs text-gray-600 space-y-0.5">
-                  {items.map((item) => (
-                    <li key={item} className="flex items-start gap-1">
-                      <span className="text-blue-400 mt-px shrink-0">•</span>{item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+      {/* Stack */}
+      <div className="grid grid-cols-3 gap-3">
+        {Object.entries(STACK).map(([title, items]) => (
+          <div key={title}>
+            <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{title}</h4>
+            <ul className="text-xs text-gray-600 space-y-0.5">
+              {items.map((item) => (
+                <li key={item} className="flex items-start gap-1">
+                  <span className="text-blue-400 mt-px shrink-0">•</span>{item}
+                </li>
+              ))}
+            </ul>
           </div>
+        ))}
+      </div>
 
-          {/* Stats */}
-          <div className="flex gap-4 text-xs text-gray-400">
-            <span><strong className="text-gray-600">16</strong> projects indexed</span>
-            <span><strong className="text-gray-600">2,100+</strong> chunks</span>
-            <span><strong className="text-gray-600">Full source code</strong></span>
-          </div>
-        </div>
-      )}
+      {/* Stats */}
+      <div className="flex gap-4 text-xs text-gray-400">
+        <span><strong className="text-gray-600">16</strong> projects indexed</span>
+        <span><strong className="text-gray-600">2,100+</strong> chunks</span>
+        <span><strong className="text-gray-600">Full source code</strong></span>
+      </div>
     </div>
   );
 }
