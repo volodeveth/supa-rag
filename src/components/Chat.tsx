@@ -192,7 +192,12 @@ export default function Chat() {
       {/* Header */}
       <header className="px-5 pt-6 pb-4">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2.5">
+            <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <circle cx="32" cy="32" r="30" stroke="#2563EB" strokeWidth="4" />
+              <path d="M24 22C24 17.6 27.6 14 32 14C36.4 14 40 17.6 40 22C40 26.4 36.4 30 32 30V38" stroke="#2563EB" strokeWidth="4" strokeLinecap="round" />
+              <circle cx="32" cy="47" r="3" fill="#2563EB" />
+            </svg>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               Ask About Dorosh
             </h1>

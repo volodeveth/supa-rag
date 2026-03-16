@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ask About Dorosh — RAG Chat",
   description: "AI-powered Q&A chatbot that answers questions about Dorosh using hybrid search and retrieval-augmented generation.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
