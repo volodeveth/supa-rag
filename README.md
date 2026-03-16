@@ -1,35 +1,99 @@
-# RAG Chat
+# Ask About Dorosh — RAG Chat
 
-A Retrieval-Augmented Generation chatbot built with Next.js and Supabase. Ingests PDF/text documents and answers questions using hybrid search with streaming responses.
+> **Live:** [ask-about-dorosh.duckdns.org](https://ask-about-dorosh.duckdns.org/)
 
-**Live demo:** [ask-about-dorosh-rag-chat.vercel.app](https://ask-about-dorosh-rag-chat.vercel.app/)
+Production-grade Retrieval-Augmented Generation chatbot. Ingests PDF/text documents, indexes source code from 16 projects, and answers questions using hybrid vector + full-text search with real-time SSE streaming.
 
 ## How It Works
 
-1. **Document ingestion** — splits text into chunks, generates vector embeddings via Jina Embeddings v3, and stores them in Supabase (pgvector)
-2. **Hybrid search** — combines vector similarity search with full-text search (BM25) using Reciprocal Rank Fusion
-3. **Reranking** — Jina Reranker v3 scores and filters the top results
+```
+PDF/Text → Chunk → Jina Embed (1024d) → Supabase pgvector
+                                              ↓
+User query → Embed → Hybrid Search (vector + BM25) → RRF Fusion → Jina Rerank → DeepSeek LLM → SSE Stream
+```
+
+1. **Document ingestion** — splits text into overlapping chunks, generates 1024-dimensional vector embeddings via Jina Embeddings v3, stores in Supabase (PostgreSQL + pgvector)
+2. **Hybrid search** — combines vector similarity search with full-text search (GIN index, BM25) using Reciprocal Rank Fusion (RRF)
+3. **Reranking** — Jina Reranker v3 scores and filters the top results for relevance
 4. **Answer generation** — DeepSeek Chat (via OpenRouter) generates a streamed response grounded in the retrieved context
 
 ## Tech Stack
 
-- **Frontend**: React 19, Next.js 16, Tailwind CSS v4
-- **Database**: Supabase (PostgreSQL + pgvector + GIN full-text index)
-- **Embeddings**: Jina Embeddings v3 (1024 dimensions)
-- **Reranking**: Jina Reranker v3
-- **LLM**: DeepSeek Chat via OpenRouter
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS v4 |
+| **Database** | Supabase (PostgreSQL + pgvector + GIN full-text index) |
+| **Embeddings** | Jina Embeddings v3 (1024 dimensions) |
+| **Reranking** | Jina Reranker v3 |
+| **LLM** | DeepSeek Chat via OpenRouter |
+| **Hosting** | AWS EC2 (t3.micro, Ubuntu 24.04) |
+| **Process Manager** | PM2 (cluster mode) |
+| **Reverse Proxy** | Nginx with SSE support |
+| **SSL** | Let's Encrypt (Certbot, auto-renewal) |
+| **CI/CD** | GitHub Actions (push to master → auto-deploy) |
+| **Build** | Next.js standalone output (~30MB) |
+
+## Architecture
+
+```
+GitHub (master push)
+    ↓
+GitHub Actions CI/CD
+    ↓
+AWS EC2 t3.micro
+├── Next.js standalone server (:3000)
+├── Nginx reverse proxy (:80/:443)
+├── SSL via Let's Encrypt (Certbot)
+└── PM2 process manager
+```
+
+## Data Pipeline
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/collect-projects.mjs` | Scans 16 project directories, extracts README/package.json/docs |
+| `scripts/ingest-one.cjs` | Ingests a single .txt file into Supabase via REST API |
+| `scripts/ingest-projects.sh` | Batch wrapper — runs `ingest-one.cjs` for each collected file |
+| `scripts/ingest-pdf.mjs` | Original CV/PDF ingestion script |
+
+```bash
+node scripts/collect-projects.mjs    # 1. Collect docs from projects
+bash scripts/ingest-projects.sh      # 2. Ingest into Supabase
+```
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/chat/route.ts     # Chat endpoint (hybrid search → rerank → SSE stream)
+│   └── page.tsx               # Home page
+├── components/
+│   └── Chat.tsx               # Chat UI (sidebar + chat layout)
+└── lib/
+    ├── embeddings.ts          # Jina embeddings client
+    ├── llm.ts                 # LLM streaming & prompt construction
+    ├── reranker.ts            # Jina reranker client
+    ├── chunker.ts             # Text chunking with overlap
+    └── supabase.ts            # Supabase client
+scripts/
+├── collect-projects.mjs       # Project docs collector
+├── ingest-one.cjs             # Single file ingestion
+├── ingest-projects.sh         # Batch ingestion wrapper
+├── ingest-pdf.mjs             # PDF ingestion
+├── deploy.sh                  # Manual deploy to EC2
+└── ec2-setup.sh               # EC2 server provisioning
+```
 
 ## Setup
 
 ### Prerequisites
 
 - Node.js 18+
-- Supabase project with pgvector extension enabled
+- Supabase project with pgvector extension
 - API keys: Jina AI, OpenRouter
 
 ### Environment Variables
-
-Create `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
@@ -43,52 +107,24 @@ OPENROUTER_API_KEY=<your-openrouter-api-key>
 
 ```bash
 npm install
-
-# Apply database migrations
-npx supabase db push
-
-# Ingest a document
-node scripts/ingest-pdf.mjs <path-to-file>
-
-# Start dev server
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Deploy to AWS EC2
+### Deploy
 
-See [docs/aws-migration.md](docs/aws-migration.md) for full deployment guide.
-
-Quick deploy:
+Push to `master` for automatic deployment via GitHub Actions, or deploy manually:
 
 ```bash
-# 1. Setup EC2 instance (run on server)
-sudo bash scripts/ec2-setup.sh
-
-# 2. Deploy from local machine
 bash scripts/deploy.sh ubuntu@<elastic-ip> ~/.ssh/your-key.pem
 ```
 
-Or push to `master` for automatic deployment via GitHub Actions.
+## Key Design Decisions
 
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── api/chat/route.ts   # Chat endpoint (search → rerank → stream)
-│   └── page.tsx             # Home page
-├── components/
-│   └── Chat.tsx             # Chat UI
-└── lib/
-    ├── embeddings.ts        # Jina embeddings
-    ├── llm.ts               # LLM streaming & prompt
-    ├── reranker.ts          # Jina reranker
-    ├── chunker.ts           # Text chunking
-    └── supabase.ts          # Supabase client
-scripts/
-└── ingest-pdf.mjs           # Document ingestion
-supabase/
-└── migrations/               # Database schema & RPC functions
-```
+- **Standalone build** — `output: "standalone"` reduces deploy size from ~200MB to ~30MB
+- **Direct REST API for ingestion** — Supabase JS SDK causes OOM (~2GB) for simple inserts; raw `fetch()` works reliably
+- **CJS for scripts** — Node 22 + dotenv v17 ESM loader causes OOM; `.cjs` format avoids this
+- **Hybrid search + RRF** — combines semantic (vector) and lexical (BM25) search for better recall
+- **SSE streaming** — real-time token-by-token response delivery via Server-Sent Events
+- **DuckDNS** — free dynamic DNS for the EC2 instance domain
