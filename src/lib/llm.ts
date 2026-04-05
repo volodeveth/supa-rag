@@ -53,7 +53,7 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
         messages,
         temperature: 0.1,
         top_p: 0.9,
-        max_tokens: 3000,
+        max_tokens: 2000,
         stream: true,
       }),
     }

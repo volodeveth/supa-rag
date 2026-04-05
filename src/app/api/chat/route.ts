@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     // 4. Rerank top chunks
     tracer.startStep("rerank");
     const { chunks: rerankedChunks, totalTokens: rerankTokens } =
-      await rerankChunks(trimmedQuery, hybridChunks, 10);
+      await rerankChunks(trimmedQuery, hybridChunks, 5);
     tracer.endStep("rerank");
     tracer.addJinaRerankTokens(rerankTokens);
     tracer.setRerankResults(rerankedChunks);
