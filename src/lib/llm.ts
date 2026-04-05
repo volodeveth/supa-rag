@@ -34,7 +34,12 @@ export function buildMessages(
   ];
 }
 
-export async function generateAnswerStream(messages: Message[]): Promise<ReadableStream> {
+interface LlmStreamResult {
+  stream: ReadableStream;
+  getUsage: () => { promptTokens: number; completionTokens: number };
+}
+
+export async function generateAnswerStream(messages: Message[]): Promise<LlmStreamResult> {
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
@@ -63,8 +68,10 @@ export async function generateAnswerStream(messages: Message[]): Promise<Readabl
 
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
+  let promptTokens = 0;
+  let completionTokens = 0;
 
-  return new ReadableStream({
+  const stream = new ReadableStream({
     async pull(controller) {
       while (true) {
         const { done, value } = await reader.read();
@@ -86,6 +93,11 @@ export async function generateAnswerStream(messages: Message[]): Promise<Readabl
             if (content) {
               controller.enqueue(new TextEncoder().encode(content));
             }
+            // Capture usage from the final chunk (OpenRouter includes it)
+            if (json.usage) {
+              promptTokens = json.usage.prompt_tokens ?? 0;
+              completionTokens = json.usage.completion_tokens ?? 0;
+            }
           } catch {
             // skip malformed chunks
           }
@@ -93,4 +105,9 @@ export async function generateAnswerStream(messages: Message[]): Promise<Readabl
       }
     },
   });
+
+  return {
+    stream,
+    getUsage: () => ({ promptTokens, completionTokens }),
+  };
 }

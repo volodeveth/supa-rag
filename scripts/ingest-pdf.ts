@@ -40,7 +40,7 @@ async function main() {
 
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
     const batch = chunks.slice(i, i + BATCH_SIZE);
-    const embeddings = await generateEmbeddings(
+    const { embeddings } = await generateEmbeddings(
       batch.map((c) => c.content),
       "retrieval.passage"
     );

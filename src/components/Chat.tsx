@@ -12,6 +12,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  traceId?: string;
+  feedback?: "thumbs_up" | "thumbs_down" | null;
 }
 
 const SUGGESTED = [
@@ -177,7 +179,7 @@ export default function Chat() {
         const data = await res.json();
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: data.answer, sources: data.sources },
+          { role: "assistant", content: data.answer, sources: data.sources, traceId: data.traceId },
         ]);
         return;
       }
@@ -185,6 +187,7 @@ export default function Chat() {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let sources: Source[] = [];
+      let traceId: string | undefined;
       let buffer = "";
 
       setMessages((prev) => [
@@ -209,9 +212,10 @@ export default function Chat() {
             const json = JSON.parse(data);
             if (json.sources) {
               sources = json.sources;
+              traceId = json.traceId;
               setMessages((prev) => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { ...updated[updated.length - 1], sources };
+                updated[updated.length - 1] = { ...updated[updated.length - 1], sources, traceId };
                 return updated;
               });
             }
@@ -235,6 +239,29 @@ export default function Chat() {
       ]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function sendFeedback(traceId: string, feedback: "thumbs_up" | "thumbs_down") {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.traceId === traceId ? { ...msg, feedback } : msg
+      )
+    );
+
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ traceId, feedback }),
+      });
+    } catch {
+      // Revert on failure
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.traceId === traceId ? { ...msg, feedback: null } : msg
+        )
+      );
     }
   }
 
@@ -314,6 +341,37 @@ export default function Chat() {
                     }`}
                   >
                     <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+
+                    {msg.role === "assistant" && msg.content && msg.traceId && (
+                      <div className="flex items-center gap-1 mt-2">
+                        <button
+                          onClick={() => sendFeedback(msg.traceId!, "thumbs_up")}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            msg.feedback === "thumbs_up"
+                              ? "text-green-600 bg-green-50"
+                              : "text-gray-400 hover:text-green-600 hover:bg-green-50"
+                          }`}
+                          title="Helpful"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(msg.traceId!, "thumbs_down")}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            msg.feedback === "thumbs_down"
+                              ? "text-red-600 bg-red-50"
+                              : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          }`}
+                          title="Not helpful"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
 
                     {msg.sources && msg.sources.length > 0 && (
                       <details className="mt-2 text-xs">

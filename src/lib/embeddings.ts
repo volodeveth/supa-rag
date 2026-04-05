@@ -11,10 +11,15 @@ interface JinaEmbeddingResponse {
 
 type EmbeddingTask = "retrieval.passage" | "retrieval.query";
 
+interface EmbeddingResult {
+  embeddings: number[][];
+  totalTokens: number;
+}
+
 export async function generateEmbeddings(
   texts: string[],
   task: EmbeddingTask = "retrieval.passage"
-): Promise<number[][]> {
+): Promise<EmbeddingResult> {
   const response = await fetch("https://api.jina.ai/v1/embeddings", {
     method: "POST",
     headers: {
@@ -38,14 +43,22 @@ export async function generateEmbeddings(
   }
 
   const json: JinaEmbeddingResponse = await response.json();
-  return json.data
-    .sort((a, b) => a.index - b.index)
-    .map((d) => d.embedding);
+  return {
+    embeddings: json.data
+      .sort((a, b) => a.index - b.index)
+      .map((d) => d.embedding),
+    totalTokens: json.usage?.total_tokens ?? 0,
+  };
+}
+
+interface QueryEmbeddingResult {
+  embedding: number[];
+  totalTokens: number;
 }
 
 export async function generateQueryEmbedding(
   query: string
-): Promise<number[]> {
-  const [embedding] = await generateEmbeddings([query], "retrieval.query");
-  return embedding;
+): Promise<QueryEmbeddingResult> {
+  const { embeddings, totalTokens } = await generateEmbeddings([query], "retrieval.query");
+  return { embedding: embeddings[0], totalTokens };
 }
