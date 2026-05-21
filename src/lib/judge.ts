@@ -10,7 +10,7 @@ export interface JudgeScores {
 }
 
 export const JUDGE_MODEL =
-  process.env.JUDGE_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
+  process.env.JUDGE_MODEL || "openai/gpt-oss-120b:free";
 
 const SYSTEM_PROMPT = `You are a strict RAG quality evaluator. You read a user QUERY, the retrieved CONTEXT chunks, and the model's ANSWER, and you score four aspects on a 0.0-1.0 scale.
 
