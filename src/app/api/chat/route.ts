@@ -75,13 +75,20 @@ export async function POST(request: NextRequest) {
     tracer.addJinaRerankTokens(rerankTokens);
     tracer.setRerankResults(rerankedChunks);
 
-    // 5. Build sources metadata
-    const sources = rerankedChunks.map((c) => ({
+    // 5. Build sources metadata.
+    // Client preview is truncated; the trace stores full content so that
+    // the LLM-judge in /api/evaluate has the real chunks to score against.
+    const sourcesForClient = rerankedChunks.map((c) => ({
       content: c.content.slice(0, 200) + "...",
       relevance: c.relevance_score,
       metadata: c.metadata,
     }));
-    tracer.setSources(sources);
+    const sourcesForTrace = rerankedChunks.map((c) => ({
+      content: c.content,
+      relevance: c.relevance_score,
+      metadata: c.metadata,
+    }));
+    tracer.setSources(sourcesForTrace);
 
     // 6. Stream the LLM response
     tracer.startStep("llm");
@@ -90,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const encoder = new TextEncoder();
     const sourcesChunk = encoder.encode(
-      `data: ${JSON.stringify({ sources, traceId: tracer.traceId })}\n\n`
+      `data: ${JSON.stringify({ sources: sourcesForClient, traceId: tracer.traceId })}\n\n`
     );
 
     let firstToken = true;

@@ -1,4 +1,6 @@
 import { createServiceClient } from "./supabase";
+import { computeCostUsd } from "./pricing";
+import { isNoAnswer } from "./no-answer";
 
 interface StepTiming {
   start: number;
@@ -144,6 +146,16 @@ export class PipelineTracer {
   async save(): Promise<void> {
     const totalMs = Math.round(performance.now() - this.data.totalStart!);
 
+    const costUsd = computeCostUsd({
+      jinaEmbedTokens: this.data.jinaEmbedTokens,
+      jinaRerankTokens: this.data.jinaRerankTokens,
+      llmPromptTokens: this.data.llmPromptTokens,
+      llmCompletionTokens: this.data.llmCompletionTokens,
+    });
+
+    const noAnswer =
+      this.data.status === "success" && isNoAnswer(this.data.answer);
+
     const row = {
       trace_id: this.data.traceId,
       query: this.data.query,
@@ -163,6 +175,8 @@ export class PipelineTracer {
       jina_rerank_tokens: this.data.jinaRerankTokens ?? 0,
       llm_prompt_tokens: this.data.llmPromptTokens ?? 0,
       llm_completion_tokens: this.data.llmCompletionTokens ?? 0,
+      cost_usd: costUsd > 0 ? +costUsd.toFixed(8) : 0,
+      is_no_answer: noAnswer,
       status: this.data.status,
       error_message: this.data.errorMessage ?? null,
       error_step: this.data.errorStep ?? null,

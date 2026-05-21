@@ -23,6 +23,15 @@ interface Trace {
   jina_rerank_tokens: number;
   llm_prompt_tokens: number;
   llm_completion_tokens: number;
+  cost_usd: number | null;
+  is_no_answer: boolean;
+  eval_faithfulness: number | null;
+  eval_answer_relevance: number | null;
+  eval_context_relevance: number | null;
+  eval_context_sufficiency: number | null;
+  eval_judge_model: string | null;
+  eval_reasoning: { reasoning?: string } | null;
+  eval_at: string | null;
   status: string;
   error_message: string | null;
   error_step: string | null;
@@ -51,6 +60,10 @@ export default function TraceDetailPage() {
     async function fetchTrace() {
       try {
         const res = await fetch(`/api/analytics?traceId=${traceId}`);
+        if (res.status === 401) {
+          window.location.href = `/analytics/login?redirect=/analytics/${traceId}`;
+          return;
+        }
         const data = await res.json();
         if (data.error) {
           setError(data.error);
@@ -65,6 +78,20 @@ export default function TraceDetailPage() {
     }
     fetchTrace();
   }, [traceId]);
+
+  async function reEvaluate() {
+    if (!trace) return;
+    const res = await fetch("/api/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ traceIds: [trace.trace_id], delayMs: 0 }),
+    });
+    if (res.ok) {
+      const r = await fetch(`/api/analytics?traceId=${traceId}`);
+      const data = await r.json();
+      if (!data.error) setTrace(data.trace);
+    }
+  }
 
   if (loading) {
     return (
@@ -145,20 +172,32 @@ export default function TraceDetailPage() {
       <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
         {/* Meta */}
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <span className="text-gray-400 text-xs block">Time</span>
               <span className="font-mono">{new Date(trace.created_at).toLocaleString()}</span>
             </div>
             <div>
               <span className="text-gray-400 text-xs block">Status</span>
-              <span className={trace.status === "error" ? "text-red-600 font-medium" : "text-green-600"}>
-                {trace.status}
-              </span>
+              {trace.status === "error" ? (
+                <span className="text-red-600 font-medium">error</span>
+              ) : trace.is_no_answer ? (
+                <span className="text-amber-600 font-medium">no-answer</span>
+              ) : trace.chunks_found === 0 ? (
+                <span className="text-amber-600 font-medium">empty retrieval</span>
+              ) : (
+                <span className="text-green-600">ok</span>
+              )}
             </div>
             <div>
               <span className="text-gray-400 text-xs block">Total Latency</span>
               <span className="font-mono font-bold">{totalMs}ms</span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-xs block">Cost</span>
+              <span className="font-mono">
+                {trace.cost_usd != null ? `$${Number(trace.cost_usd).toFixed(6)}` : "—"}
+              </span>
             </div>
             <div>
               <span className="text-gray-400 text-xs block">Feedback</span>
@@ -168,6 +207,51 @@ export default function TraceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* LLM-as-a-judge Eval */}
+        <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">
+              LLM-as-a-judge Eval
+              {trace.eval_judge_model && (
+                <span className="ml-2 text-[10px] font-mono text-gray-400">
+                  {trace.eval_judge_model}
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={reEvaluate}
+              className="text-xs text-purple-600 hover:text-purple-800 cursor-pointer"
+            >
+              {trace.eval_at ? "Re-evaluate" : "Evaluate now"}
+            </button>
+          </div>
+          <div className="px-5 py-4">
+            {trace.eval_at ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <EvalBlock label="Faithfulness" v={trace.eval_faithfulness} />
+                  <EvalBlock label="Answer Relevance" v={trace.eval_answer_relevance} />
+                  <EvalBlock label="Context Relevance" v={trace.eval_context_relevance} />
+                  <EvalBlock label="Context Sufficiency" v={trace.eval_context_sufficiency} />
+                </div>
+                {trace.eval_reasoning?.reasoning && (
+                  <div className="mt-4 text-xs text-gray-600 bg-gray-50 rounded-lg p-3">
+                    <span className="text-gray-400 block mb-1">Judge reasoning:</span>
+                    {trace.eval_reasoning.reasoning}
+                  </div>
+                )}
+                <div className="mt-2 text-[10px] text-gray-400">
+                  Evaluated {new Date(trace.eval_at).toLocaleString()}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Not yet evaluated. Click &quot;Evaluate now&quot; to run the LLM-judge on this trace.
+              </p>
+            )}
+          </div>
+        </section>
 
         {/* Error */}
         {trace.error_message && (
@@ -287,6 +371,27 @@ export default function TraceDetailPage() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+function EvalBlock({ label, v }: { label: string; v: number | null }) {
+  const color =
+    v == null
+      ? "text-gray-300"
+      : v < 0.5
+        ? "text-red-600"
+        : v < 0.75
+          ? "text-amber-600"
+          : "text-green-600";
+  return (
+    <div>
+      <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+        {label}
+      </div>
+      <div className={`text-2xl font-bold font-mono mt-0.5 ${color}`}>
+        {v == null ? "—" : v.toFixed(2)}
+      </div>
     </div>
   );
 }

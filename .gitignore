@@ -45,3 +45,10 @@ next-env.d.ts
 
 # project docs (generated, contains source code from other repos)
 scripts/project-docs/
+
+# supabase cli artifacts
+supabase/.temp/
+
+# local session scratch
+monitor.txt
+11.txt
