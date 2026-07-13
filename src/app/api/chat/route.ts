@@ -5,6 +5,34 @@ import { buildMessages, generateAnswerStream } from "@/lib/llm";
 import { rerankChunks } from "@/lib/reranker";
 import { PipelineTracer, hashIp } from "@/lib/tracer";
 
+// Origins allowed to call this API cross-site (portfolio chat widget)
+const ALLOWED_ORIGINS = new Set([
+  "https://volodeveth.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:3456",
+]);
+
+function corsHeaders(request: NextRequest): Record<string, string> {
+  const origin = request.headers.get("origin") || "";
+  if (!ALLOWED_ORIGINS.has(origin)) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    Vary: "Origin",
+  };
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders(request),
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const tracer = new PipelineTracer("");
 
@@ -14,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return NextResponse.json(
         { error: "Query is required" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(request) }
       );
     }
 
@@ -50,7 +78,7 @@ export async function POST(request: NextRequest) {
       tracer.save();
       return NextResponse.json(
         { error: "Search failed" },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(request) }
       );
     }
 
@@ -59,12 +87,15 @@ export async function POST(request: NextRequest) {
     // 3. If no relevant chunks found
     if (!hybridChunks || hybridChunks.length === 0) {
       tracer.save();
-      return NextResponse.json({
-        answer:
-          "I don't have relevant information in the documents to answer this question.",
-        sources: [],
-        traceId: tracer.traceId,
-      });
+      return NextResponse.json(
+        {
+          answer:
+            "I don't have relevant information in the documents to answer this question.",
+          sources: [],
+          traceId: tracer.traceId,
+        },
+        { headers: corsHeaders(request) }
+      );
     }
 
     // 4. Rerank top chunks
@@ -139,6 +170,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        ...corsHeaders(request),
       },
     });
   } catch (err) {
@@ -147,7 +179,7 @@ export async function POST(request: NextRequest) {
     tracer.save();
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(request) }
     );
   }
 }
