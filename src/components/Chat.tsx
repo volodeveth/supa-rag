@@ -75,7 +75,7 @@ function Sidebar({ onNewChat, hasMessages, sidebarOpen, onClose }: {
             </h1>
           </div>
           <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-            Production RAG system indexing 16 projects, full source code &amp; CV.
+            Production RAG system indexing 34 projects, full source code &amp; CV.
             Ask anything to explore Volodymyr&apos;s engineering skills.
           </p>
         </div>
@@ -122,7 +122,7 @@ function Sidebar({ onNewChat, hasMessages, sidebarOpen, onClose }: {
         <div className="px-5 py-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400 mb-3">
             <span><strong className="text-gray-600">16</strong> projects</span>
-            <span><strong className="text-gray-600">2,100+</strong> chunks</span>
+            <span><strong className="text-gray-600">3,400+</strong> chunks</span>
             <span><strong className="text-gray-600">Full source</strong></span>
           </div>
           {hasMessages && (
