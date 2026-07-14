@@ -4,6 +4,12 @@ on:
   push:
     branches: [master]
 
+# Serialize deploys: two close pushes must not scp into the same directory
+# concurrently (queue instead of cancel — never kill a deploy mid-upload).
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
