@@ -18,8 +18,6 @@ GitHub: github.com/volodeveth
 
 DOU: View Profile
 
-Rate: $20+/hour
-
 ## PROFESSIONAL SUMMARY
 
 AI engineer & full-stack developer — 10+ years of software engineering, the last 3 focused on LLM and agentic systems — with 20+ shipped products . I engineer AI agents and agentic systems that do real work: real-time voice agents (LiveKit, OpenAI Realtime, Whisper), self-extending assistants that write their own skills (dual-LLM, OpenClaw), production RAG pipelines (pgvector, Jina AI, hybrid search), LLM fine-tuning (QLoRA, LoRA, PEFT, GGUF/Ollama) with synthetic dataset generation, LangGraph agents, and AI-powered site auditing (Playwright + multi-LLM routing). I build the full stack around them — Next.js/React/Remix frontend, Python/Django/Node.js/PHP (Symfony) backend, Solidity smart contracts, Shopify apps (Polaris, App Bridge, Liquid) — and develop with a multi-agent Claude Code workflow (Planner, Architect, Implementer, Reviewer, Security Auditor in parallel), so every project ships with automated code review, security audit, and personal quality control. Official judge at NFT Design Awards. Team output. Solo price. Available worldwide for remote collaboration.
