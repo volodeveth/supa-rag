@@ -122,7 +122,7 @@ Claude / Claude Code, ChatGPT / OpenAI API, Google Gemini, xAI Grok, DeepSeek, M
 
 ### Ask About Dorosh — Production RAG System | Live Demo | GitHub
 
-Production-grade chatbot that indexes 34 real projects + CV (3,440+ chunks). Hybrid search (pgvector HNSW + BM25 GIN) with Reciprocal Rank Fusion, Jina Reranker v3 neural cross-encoder, DeepSeek LLM streaming via SSE. Self-hosted on AWS EC2 with Nginx reverse proxy, PM2 process manager, Let's Encrypt SSL, and GitHub Actions CI/CD auto-deploy.
+Production-grade chatbot that indexes 34 real projects + CV (3,360+ chunks). Hybrid search (pgvector HNSW + BM25 GIN) with Reciprocal Rank Fusion, Jina Reranker v3 neural cross-encoder, DeepSeek LLM streaming via SSE. Self-hosted on AWS EC2 with Nginx reverse proxy, PM2 process manager, Let's Encrypt SSL, and GitHub Actions CI/CD auto-deploy.
 
 Technologies: Next.js 16, React 19, TypeScript, Tailwind CSS v4, Supabase PostgreSQL + pgvector, Jina Embeddings v3, Jina Reranker v3, DeepSeek (OpenRouter), AWS EC2, Nginx, PM2, GitHub Actions
 
@@ -212,7 +212,7 @@ Self-Extending AI Agent - Built agent that autonomously writes, validates, and d
 
 Real-Time Voice AI - Speech-to-speech ordering agent in Ukrainian built on LiveKit + OpenAI Realtime API
 
-Production RAG System - Hybrid search (pgvector + BM25 + RRF), Jina neural reranking, 3,440+ indexed chunks, self-hosted on AWS EC2
+Production RAG System - Hybrid search (pgvector + BM25 + RRF), Jina neural reranking, 3,360+ indexed chunks, self-hosted on AWS EC2
 
 End-to-End ML Pipeline - From synthetic dataset generation → QLoRA/LoRA fine-tuning → GGUF export → Ollama deployment
 

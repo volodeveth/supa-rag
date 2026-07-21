@@ -122,7 +122,7 @@ function Sidebar({ onNewChat, hasMessages, sidebarOpen, onClose }: {
         <div className="px-5 py-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400 mb-3">
             <span><strong className="text-gray-600">16</strong> projects</span>
-            <span><strong className="text-gray-600">3,440+</strong> chunks</span>
+            <span><strong className="text-gray-600">3,360+</strong> chunks</span>
             <span><strong className="text-gray-600">Full source</strong></span>
           </div>
           {hasMessages && (
