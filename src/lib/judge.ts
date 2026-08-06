@@ -9,8 +9,26 @@ export interface JudgeScores {
   reasoning: string;
 }
 
-export const JUDGE_MODEL =
-  process.env.JUDGE_MODEL || "openai/gpt-oss-120b:free";
+// Fallback chain. Tried in order; we move to the next model on transport errors
+// (404 for retired slugs, 429 rate limits, 5xx) and on unusable output.
+// All of these are non-reasoning instruct models — reasoning models spend the
+// token budget on a `reasoning` field and return `content: null`.
+// None of them is DeepSeek: the judge must differ from the generator to avoid self-bias.
+const DEFAULT_JUDGE_MODELS = [
+  "google/gemma-4-26b-a4b-it:free",
+  "google/gemma-4-26b-a4b-it",
+  "qwen/qwen3-30b-a3b-instruct-2507",
+];
+
+// JUDGE_MODEL env var pins a single model; JUDGE_MODELS overrides the whole chain.
+export const JUDGE_MODELS: string[] = process.env.JUDGE_MODELS
+  ? process.env.JUDGE_MODELS.split(",").map((s) => s.trim()).filter(Boolean)
+  : process.env.JUDGE_MODEL
+    ? [process.env.JUDGE_MODEL]
+    : DEFAULT_JUDGE_MODELS;
+
+// Label for reporting when no single model has answered yet.
+export const JUDGE_MODEL = JUDGE_MODELS.join(" → ");
 
 const SYSTEM_PROMPT = `You are a strict RAG quality evaluator. You read a user QUERY, the retrieved CONTEXT chunks, and the model's ANSWER, and you score four aspects on a 0.0-1.0 scale.
 
@@ -71,9 +89,10 @@ function extractJson(text: string): JudgeScores | null {
   }
 }
 
-export async function judgeTrace(input: JudgeInput): Promise<JudgeScores | null> {
-  const userPrompt = buildUserPrompt(input);
-
+async function callJudgeModel(
+  model: string,
+  userPrompt: string
+): Promise<JudgeScores> {
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
     {
@@ -83,13 +102,15 @@ export async function judgeTrace(input: JudgeInput): Promise<JudgeScores | null>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: JUDGE_MODEL,
+        model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.0,
-        max_tokens: 400,
+        // Generous budget: a reasoning model that slips into the chain would
+        // otherwise burn the whole allowance before emitting any content.
+        max_tokens: 800,
         // Models that support JSON mode honor this; others ignore it.
         response_format: { type: "json_object" },
       }),
@@ -104,8 +125,51 @@ export async function judgeTrace(input: JudgeInput): Promise<JudgeScores | null>
   }
 
   const json = await response.json();
-  const content: string | undefined = json.choices?.[0]?.message?.content;
-  if (!content) return null;
+  if (json.error) {
+    // OpenRouter can return a 200 with an error body (upstream provider failures).
+    throw new Error(
+      `Judge upstream error: ${JSON.stringify(json.error).slice(0, 300)}`
+    );
+  }
 
-  return extractJson(content);
+  const message = json.choices?.[0]?.message;
+  // Reasoning models put everything in `reasoning` and leave `content` null.
+  const raw: string | undefined = message?.content || message?.reasoning;
+  if (!raw) {
+    const finish = json.choices?.[0]?.finish_reason ?? "unknown";
+    throw new Error(`Judge returned empty content (finish_reason: ${finish})`);
+  }
+
+  const scores = extractJson(raw);
+  if (!scores) {
+    throw new Error(`Judge returned unparseable output: ${raw.slice(0, 200)}`);
+  }
+  return scores;
+}
+
+export interface JudgeResult extends JudgeScores {
+  /** Model that actually produced the scores — may not be the first in the chain. */
+  model: string;
+}
+
+/**
+ * Scores one trace, walking the model chain until one succeeds.
+ * Throws with every attempt's error only when the whole chain fails.
+ */
+export async function judgeTrace(input: JudgeInput): Promise<JudgeResult> {
+  const userPrompt = buildUserPrompt(input);
+  const failures: string[] = [];
+
+  for (const model of JUDGE_MODELS) {
+    try {
+      const scores = await callJudgeModel(model, userPrompt);
+      return { ...scores, model };
+    } catch (err) {
+      failures.push(
+        `${model}: ${err instanceof Error ? err.message : "unknown"}`
+      );
+    }
+  }
+
+  throw new Error(`All judge models failed — ${failures.join(" | ")}`);
 }

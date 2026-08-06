@@ -103,12 +103,6 @@ export async function POST(request: NextRequest) {
         sources: t.sources,
       });
 
-      if (!scores) {
-        failed++;
-        errors.push({ trace_id: t.trace_id, reason: "Judge returned no JSON" });
-        continue;
-      }
-
       const { error: updateErr } = await supabase
         .from("chat_traces")
         .update({
@@ -116,7 +110,7 @@ export async function POST(request: NextRequest) {
           eval_answer_relevance: scores.answer_relevance,
           eval_context_relevance: scores.context_relevance,
           eval_context_sufficiency: scores.context_sufficiency,
-          eval_judge_model: JUDGE_MODEL,
+          eval_judge_model: scores.model,
           eval_reasoning: { reasoning: scores.reasoning },
           eval_at: new Date().toISOString(),
         })
