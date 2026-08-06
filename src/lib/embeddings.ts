@@ -1,3 +1,5 @@
+export const EMBEDDING_MODEL = "jina-embeddings-v3";
+
 interface JinaEmbeddingResponse {
   data: Array<{
     index: number;
@@ -28,7 +30,7 @@ export async function generateEmbeddings(
       Accept: "application/json",
     },
     body: JSON.stringify({
-      model: "jina-embeddings-v3",
+      model: EMBEDDING_MODEL,
       input: texts,
       task,
       dimensions: 1024,

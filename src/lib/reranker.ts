@@ -1,3 +1,5 @@
+export const RERANKER_MODEL = "jina-reranker-v3";
+
 interface JinaRerankResult {
   index: number;
   relevance_score: number;
@@ -56,7 +58,7 @@ export async function rerankChunks(
       Accept: "application/json",
     },
     body: JSON.stringify({
-      model: "jina-reranker-v3",
+      model: RERANKER_MODEL,
       query,
       documents: chunks.map((c) => c.content),
       top_n: topN,

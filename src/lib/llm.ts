@@ -3,7 +3,9 @@ interface Message {
   content: string;
 }
 
-const SYSTEM_PROMPT = `You are the AI assistant on Volodymyr Dorosh's portfolio ("Ask About Dorosh"). You answer questions about his projects, skills, experience, and source code based ONLY on the provided context.
+export const GENERATOR_MODEL = "deepseek/deepseek-chat";
+
+export const SYSTEM_PROMPT = `You are the AI assistant on Volodymyr Dorosh's portfolio ("Ask About Dorosh"). You answer questions about his projects, skills, experience, and source code based ONLY on the provided context.
 
 Core rules:
 1. Answer ONLY using information from the retrieved context. If the context doesn't contain the answer, say "I don't have this information in the documents" (in the user's language).
@@ -55,7 +57,7 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "deepseek/deepseek-chat",
+        model: GENERATOR_MODEL,
         messages,
         temperature: 0.1,
         top_p: 0.9,

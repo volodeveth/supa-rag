@@ -1,6 +1,7 @@
 import { createServiceClient } from "./supabase";
 import { computeCostUsd } from "./pricing";
 import { isNoAnswer } from "./no-answer";
+import { PIPELINE_VERSIONS } from "./versions";
 
 interface StepTiming {
   start: number;
@@ -182,6 +183,11 @@ export class PipelineTracer {
       error_step: this.data.errorStep ?? null,
       user_agent: this.data.userAgent ?? null,
       ip_hash: this.data.ipHash ?? null,
+      // Provenance — what produced this answer, so metric changes are attributable.
+      generator_model: PIPELINE_VERSIONS.generatorModel,
+      embedding_model: PIPELINE_VERSIONS.embeddingModel,
+      reranker_model: PIPELINE_VERSIONS.rerankerModel,
+      prompt_version: PIPELINE_VERSIONS.promptVersion,
     };
 
     try {
