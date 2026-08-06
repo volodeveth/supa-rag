@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
         }
 
         tracer.endStep("llm");
-        const { promptTokens, completionTokens } = getUsage();
-        tracer.setLlmTokens(promptTokens, completionTokens);
+        const { promptTokens, completionTokens, costUsd } = getUsage();
+        tracer.setLlmTokens(promptTokens, completionTokens, costUsd);
 
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();

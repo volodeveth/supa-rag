@@ -3,7 +3,10 @@ interface Message {
   content: string;
 }
 
-export const GENERATOR_MODEL = "deepseek/deepseek-chat";
+// Overridable without a deploy — the provenance columns record whatever
+// actually served the request, so switching models stays measurable.
+export const GENERATOR_MODEL =
+  process.env.GENERATOR_MODEL || "deepseek/deepseek-v4-pro";
 
 export const SYSTEM_PROMPT = `You are the AI assistant on Volodymyr Dorosh's portfolio ("Ask About Dorosh"). You answer questions about his projects, skills, experience, and source code based ONLY on the provided context.
 
@@ -44,7 +47,12 @@ export function buildMessages(
 
 interface LlmStreamResult {
   stream: ReadableStream;
-  getUsage: () => { promptTokens: number; completionTokens: number };
+  getUsage: () => {
+    promptTokens: number;
+    completionTokens: number;
+    /** Provider-reported USD cost. Null when the provider omits it. */
+    costUsd: number | null;
+  };
 }
 
 export async function generateAnswerStream(messages: Message[]): Promise<LlmStreamResult> {
@@ -63,6 +71,13 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
         top_p: 0.9,
         max_tokens: 2000,
         stream: true,
+        // DeepSeek V4 is a reasoning model. Left on, it emits `delta.reasoning`
+        // chunks that this stream drops, so the user stares at an empty box
+        // until reasoning ends — and those tokens still bill as completion.
+        // Grounded RAG answers do not need a reasoning pass.
+        reasoning: { enabled: false },
+        // Ask for token counts *and* the provider's own cost on the last chunk.
+        usage: { include: true },
       }),
     }
   );
@@ -78,6 +93,7 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
   const decoder = new TextDecoder();
   let promptTokens = 0;
   let completionTokens = 0;
+  let costUsd: number | null = null;
 
   const stream = new ReadableStream({
     async pull(controller) {
@@ -105,6 +121,10 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
             if (json.usage) {
               promptTokens = json.usage.prompt_tokens ?? 0;
               completionTokens = json.usage.completion_tokens ?? 0;
+              // Provider-reported cost beats any local rate table: it cannot
+              // drift when the provider reprices or routes to another host.
+              costUsd =
+                typeof json.usage.cost === "number" ? json.usage.cost : null;
             }
           } catch {
             // skip malformed chunks
@@ -116,6 +136,6 @@ export async function generateAnswerStream(messages: Message[]): Promise<LlmStre
 
   return {
     stream,
-    getUsage: () => ({ promptTokens, completionTokens }),
+    getUsage: () => ({ promptTokens, completionTokens, costUsd }),
   };
 }

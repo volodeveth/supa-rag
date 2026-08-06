@@ -33,6 +33,8 @@ interface TraceData {
   jinaRerankTokens: number;
   llmPromptTokens: number;
   llmCompletionTokens: number;
+  /** Provider-reported cost for the completion; null when not reported. */
+  llmCostUsd: number | null;
 
   // Status
   status: "success" | "error";
@@ -122,9 +124,10 @@ export class PipelineTracer {
     this.data.jinaRerankTokens = (this.data.jinaRerankTokens || 0) + tokens;
   }
 
-  setLlmTokens(prompt: number, completion: number) {
+  setLlmTokens(prompt: number, completion: number, costUsd?: number | null) {
     this.data.llmPromptTokens = prompt;
     this.data.llmCompletionTokens = completion;
+    this.data.llmCostUsd = costUsd ?? null;
   }
 
   // --- Error ---
@@ -152,6 +155,8 @@ export class PipelineTracer {
       jinaRerankTokens: this.data.jinaRerankTokens,
       llmPromptTokens: this.data.llmPromptTokens,
       llmCompletionTokens: this.data.llmCompletionTokens,
+      llmModel: PIPELINE_VERSIONS.generatorModel,
+      llmCostUsd: this.data.llmCostUsd,
     });
 
     const noAnswer =
