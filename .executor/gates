@@ -1,0 +1,2 @@
+# gates for supa-rag
+npx tsc --noEmit -p .
