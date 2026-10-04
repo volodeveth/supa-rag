@@ -48,8 +48,9 @@ GitHub (master push) ──→ Vercel build ──→ Vercel Functions (Node.js,
 GitHub Actions cron ──→ POST /api/evaluate (*/15)   ·   check-alerts.cjs → Telegram (hourly)
 ```
 
-Previously self-hosted on AWS EC2 (Nginx, PM2, Certbot); moved to Vercel when the
-free tier ended. Nothing in the pipeline depended on the host — only deploy and cron changed.
+Previously self-hosted on AWS EC2 (Nginx, PM2, Certbot). As a personal portfolio project with
+modest traffic it did not justify an always-on server, so it moved to Vercel serverless to
+optimize running costs. Nothing in the pipeline depended on the host — only deploy and cron changed.
 
 ## Observability & Evaluation
 

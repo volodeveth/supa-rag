@@ -15,7 +15,7 @@ RAG chatbot built with Next.js 16, Supabase (pgvector), Jina AI, OpenRouter (Dee
 
 ## Live URLs
 - **Production:** https://ask-about-dorosh-rag-chat.vercel.app
-- **Old (dead):** https://ask-about-dorosh.duckdns.org — AWS EC2, shut down 2026-10 when the free tier ended
+- **Old (dead):** https://ask-about-dorosh.duckdns.org — AWS EC2, retired 2026-10: moved to Vercel to optimize running costs (personal project, modest traffic)
 
 ## Deployment
 - Push to `master` → Vercel builds and deploys. Manual: `vercel --prod`.
