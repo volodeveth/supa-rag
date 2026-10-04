@@ -20,7 +20,7 @@ const SUGGESTED = [
   "What projects has Volodymyr built?",
   "What tech stack does InkBot use?",
   "Show me the NiFTa smart contract code",
-  "What is Volodymyr's experience with AWS?",
+  "What is Volodymyr's experience with RAG systems?",
 ];
 
 const PIPELINE_STEPS = [
@@ -36,7 +36,7 @@ const PIPELINE_STEPS = [
 const STACK = {
   Frontend: ["Next.js 16", "React 19", "TypeScript", "Tailwind v4", "SSE Streaming"],
   "Backend & AI": ["Supabase pgvector", "Jina Embeddings v3", "Jina Reranker v3", "DeepSeek (OpenRouter)", "Hybrid Search (RRF)"],
-  Infrastructure: ["AWS EC2", "Nginx + SSL", "PM2 Cluster", "GitHub Actions CI/CD", "Standalone Build (~30MB)"],
+  Infrastructure: ["Vercel (Fluid Compute)", "Git push → auto-deploy", "GitHub Actions cron", "LLM-as-a-judge evals", "Telegram alerts"],
 };
 
 function Sidebar({ onNewChat, hasMessages, sidebarOpen, onClose }: {

@@ -1,0 +1,44 @@
+name: Cron — judge & alerts
+
+# Replaces the EC2 crontab. Vercel Hobby crons run at most once a day,
+# so the scheduled work lives in GitHub Actions and calls the deployed app.
+on:
+  schedule:
+    - cron: "*/15 * * * *" # LLM-as-a-judge over unjudged traces
+    - cron: "7 * * * *"    # threshold alerts → Telegram
+  workflow_dispatch:
+
+concurrency:
+  group: cron-${{ github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/run-eval.cjs
+        env:
+          BASE_URL: ${{ vars.BASE_URL }}
+          EVAL_CRON_KEY: ${{ secrets.EVAL_CRON_KEY }}
+
+  alerts:
+    if: github.event.schedule == '7 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-alerts.cjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

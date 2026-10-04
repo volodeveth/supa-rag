@@ -9,58 +9,26 @@ RAG chatbot built with Next.js 16, Supabase (pgvector), Jina AI, OpenRouter (Dee
 - **Embeddings:** Jina Embeddings v3 (1024 dimensions)
 - **Reranking:** Jina Reranker v3
 - **LLM:** DeepSeek Chat via OpenRouter
-- **Hosting:** AWS EC2 t2/t3.micro (free tier)
-- **Process Manager:** PM2
-- **Reverse Proxy:** Nginx with SSE support
-- **SSL:** Let's Encrypt (Certbot, auto-renewal)
-- **CI/CD:** GitHub Actions (push to master → deploy to EC2)
+- **Hosting:** Vercel Hobby (Fluid Compute, Node.js runtime; SSE works without Edge)
+- **CI/CD:** Vercel Git integration (push to master → production deploy)
+- **Scheduled jobs:** GitHub Actions `.github/workflows/cron.yml` (judge */15, alerts hourly)
 
 ## Live URLs
-- **Production:** https://ask-about-dorosh.duckdns.org
-- **Legacy (Vercel):** https://ask-about-dorosh-rag-chat.vercel.app/
-
-## Infrastructure — AWS EC2
-
-```
-GitHub (master) → GitHub Actions → EC2 t3.micro
-                                   ├── Next.js standalone server (:3000)
-                                   ├── Nginx reverse proxy (:80/:443)
-                                   └── SSL via Let's Encrypt (Certbot)
-```
-
-- **Instance:** t3.micro (2 vCPU, 1 GB RAM), Ubuntu 24.04 LTS
-- **IP:** 13.63.225.134 (Elastic IP)
-- **Domain:** ask-about-dorosh.duckdns.org (DuckDNS, free)
-- **SSH:** `ssh -i ~/.ssh/rag-chat-key1.pem ubuntu@13.63.225.134`
-- **App directory on server:** `/home/ubuntu/rag-chat/`
-- **Env vars on server:** `/home/ubuntu/rag-chat/.env.production`
+- **Production:** https://ask-about-dorosh-rag-chat.vercel.app
+- **Old (dead):** https://ask-about-dorosh.duckdns.org — AWS EC2, shut down 2026-10 when the free tier ended
 
 ## Deployment
-
-### Manual deploy
-```bash
-bash scripts/deploy.sh ubuntu@13.63.225.134 ~/.ssh/rag-chat-key1.pem
-```
-
-### Auto deploy
-Push to `master` → GitHub Actions builds and deploys automatically.
-
-### Required GitHub Secrets
-- `EC2_HOST` — Elastic IP
-- `EC2_USER` — `ubuntu`
-- `EC2_SSH_KEY` — contents of `.pem` file
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Push to `master` → Vercel builds and deploys. Manual: `vercel --prod`.
+- Env vars live in Vercel project settings; `vercel env pull .env.local` to sync.
+- Cron needs GitHub repo variable `BASE_URL` + secrets `EVAL_CRON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+- Vercel Hobby crons run once a day max — that's why scheduling lives in GitHub Actions.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `next.config.ts` | `output: "standalone"` for minimal deploy (~30MB) |
-| `ecosystem.config.js` | PM2 config, loads `.env.production` |
-| `scripts/ec2-setup.sh` | Server provisioning (Node.js, PM2, Nginx, Certbot) |
-| `scripts/deploy.sh` | Manual deploy via scp + SSH |
-| `.github/workflows/deploy.yml` | CI/CD pipeline |
+| `.github/workflows/cron.yml` | Scheduled judge + alerts |
 | `src/app/api/chat/route.ts` | Chat API endpoint (SSE streaming) |
 | `src/components/Chat.tsx` | Chat UI component |
 | `src/lib/` | Embeddings, LLM, reranker, chunker, supabase client |
@@ -73,16 +41,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 JINA_API_KEY
 OPENROUTER_API_KEY
-```
-
-## Server Commands
-```bash
-pm2 status                    # app status
-pm2 logs rag-chat             # live logs
-pm2 restart rag-chat          # restart
-pm2 delete rag-chat && pm2 start ecosystem.config.js  # full restart with env reload
-sudo nginx -t && sudo systemctl reload nginx           # reload nginx
-sudo certbot renew            # renew SSL (auto via systemd timer)
 ```
 
 ## Data Ingestion
@@ -112,8 +70,5 @@ bash scripts/ingest-projects.sh            # 3. Ingest into Supabase
 - **`chunkText()` infinite loop bug** in `ingest-pdf.mjs` / `ingest.mjs`: when last chunk ≤ CHUNK_OVERLAP, `start` never advances. Fixed in `ingest-one.cjs`
 
 ## Important Notes
-- `ecosystem.config.js` reads `.env.production` at startup — PM2 must be `delete` + `start` (not just `restart`) to reload env vars
-- Deploy script preserves `.env.production` on server during redeployment
-- Nginx configured with `proxy_buffering off` for SSE streaming support
 - Chat API field is `query` (not `message`)
-- SSL cert auto-renews, expires 2026-06-13
+- `ingest-one.cjs` only appends: delete old rows for a `source` before re-ingesting it

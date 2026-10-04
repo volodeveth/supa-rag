@@ -3,11 +3,11 @@
  * Cron-friendly wrapper around POST /api/evaluate.
  *
  * Usage:
- *   EVAL_CRON_KEY=... BASE_URL=https://ask-about-dorosh.duckdns.org \
+ *   EVAL_CRON_KEY=... BASE_URL=https://ask-about-dorosh-rag-chat.vercel.app \
  *     node scripts/run-eval.cjs
  *
- * Recommended cron (every 15 min):
- *   star/15 * * * * EVAL_CRON_KEY=... BASE_URL=... node /home/ubuntu/rag-chat/scripts/run-eval.cjs
+ * Scheduled by .github/workflows/cron.yml (every 15 min). Manual crontab equivalent:
+ *   star/15 * * * * EVAL_CRON_KEY=... BASE_URL=... node scripts/run-eval.cjs
  */
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";

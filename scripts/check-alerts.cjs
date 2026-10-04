@@ -18,8 +18,8 @@
  *   ALERT_MAX_NO_ANSWER_RATE, ALERT_MAX_ERROR_RATE, ALERT_MAX_EVAL_BACKLOG,
  *   ALERT_SILENCE_HOURS, ALERT_WINDOW_HOURS
  *
- * Recommended cron (hourly):
- *   0 * * * * cd /home/ubuntu/rag-chat && node scripts/check-alerts.cjs >> /var/log/rag-alerts.log 2>&1
+ * Scheduled by .github/workflows/cron.yml (hourly). Manual crontab equivalent:
+ *   0 * * * * node scripts/check-alerts.cjs
  */
 
 const fs = require("fs");
@@ -244,7 +244,7 @@ async function notify(text) {
     "",
     ...alerts,
     "",
-    "https://ask-about-dorosh.duckdns.org/analytics",
+    "https://ask-about-dorosh-rag-chat.vercel.app/analytics",
   ].join("\n");
 
   await notify(body);

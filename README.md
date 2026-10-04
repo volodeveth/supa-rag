@@ -1,6 +1,6 @@
 # Ask About Dorosh — RAG Chat
 
-> **Live:** [ask-about-dorosh.duckdns.org](https://ask-about-dorosh.duckdns.org/)
+> **Live:** [ask-about-dorosh-rag-chat.vercel.app](https://ask-about-dorosh-rag-chat.vercel.app/)
 
 Production-grade Retrieval-Augmented Generation chatbot. Ingests PDF/text documents, indexes source code and docs from 34 projects (3,364 chunks), and answers questions using hybrid vector + full-text search with real-time SSE streaming.
 
@@ -34,26 +34,22 @@ User query → Embed → Hybrid Search (vector + BM25) → RRF Fusion → Jina R
 | **LLM** | DeepSeek V4 Pro via OpenRouter (reasoning disabled; swap via `GENERATOR_MODEL`) |
 | **Eval judge** | Gemma 4 / Qwen3 via OpenRouter — deliberately not the generator |
 | **Observability** | Postgres trace table + SQL views, `/analytics` dashboard, Telegram alerts |
-| **Hosting** | AWS EC2 (t3.micro, Ubuntu 24.04) |
-| **Process Manager** | PM2 (cluster mode) |
-| **Reverse Proxy** | Nginx with SSE support |
-| **SSL** | Let's Encrypt (Certbot, auto-renewal) |
-| **CI/CD** | GitHub Actions (push to master → auto-deploy) |
-| **Build** | Next.js standalone output (~30MB) |
+| **Hosting** | Vercel (Fluid Compute, Node.js runtime — SSE streams without Edge) |
+| **CI/CD** | Vercel Git integration (push to master → production, PRs → preview) |
+| **Scheduled jobs** | GitHub Actions cron — judge every 15 min, alerts hourly |
 
 ## Architecture
 
 ```
-GitHub (master push)
-    ↓
-GitHub Actions CI/CD
-    ↓
-AWS EC2 t3.micro
-├── Next.js standalone server (:3000)
-├── Nginx reverse proxy (:80/:443)
-├── SSL via Let's Encrypt (Certbot)
-└── PM2 process manager
+GitHub (master push) ──→ Vercel build ──→ Vercel Functions (Node.js, Fluid Compute)
+                                          ├── /api/chat      SSE stream
+                                          ├── /api/evaluate  judge worker
+                                          └── /analytics     dashboard
+GitHub Actions cron ──→ POST /api/evaluate (*/15)   ·   check-alerts.cjs → Telegram (hourly)
 ```
+
+Previously self-hosted on AWS EC2 (Nginx, PM2, Certbot); moved to Vercel when the
+free tier ended. Nothing in the pipeline depended on the host — only deploy and cron changed.
 
 ## Observability & Evaluation
 
@@ -166,9 +162,7 @@ scripts/
 ├── ingest-projects.sh         # Batch ingestion wrapper
 ├── ingest-pdf.mjs             # PDF ingestion
 ├── run-eval.cjs               # Cron wrapper for the judge
-├── check-alerts.cjs           # Threshold alerts → Telegram
-├── deploy.sh                  # Manual deploy to EC2
-└── ec2-setup.sh               # EC2 server provisioning
+└── check-alerts.cjs           # Threshold alerts → Telegram
 supabase/migrations/           # Schema, hybrid search, traces, analytics, provenance
 ```
 
@@ -214,10 +208,10 @@ ALERT_SILENCE_HOURS=48
 
 ### Cron
 
-```
-*/15 * * * * cd /path/to/app && EVAL_CRON_KEY=... BASE_URL=... node scripts/run-eval.cjs
-0    * * * * cd /path/to/app && node scripts/check-alerts.cjs
-```
+`.github/workflows/cron.yml` runs both jobs (Vercel Hobby crons are limited to once a day).
+It needs the repo variable `BASE_URL` and the secrets `EVAL_CRON_KEY`,
+`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+The 15-minute judge run also keeps the free Supabase project from pausing on inactivity.
 
 ### Install & Run
 
@@ -230,20 +224,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Deploy
 
-Push to `master` for automatic deployment via GitHub Actions, or deploy manually:
-
-```bash
-bash scripts/deploy.sh ubuntu@<elastic-ip> ~/.ssh/your-key.pem
-```
+The repo is connected to Vercel: push to `master` deploys production, other branches get
+preview URLs. Manual deploy: `vercel --prod`. Environment variables live in the Vercel project
+settings (`vercel env pull .env.local` to sync locally).
 
 ## Key Design Decisions
 
-- **Standalone build** — `output: "standalone"` reduces deploy size from ~200MB to ~30MB
 - **Direct REST API for ingestion** — Supabase JS SDK causes OOM (~2GB) for simple inserts; raw `fetch()` works reliably
 - **CJS for scripts** — Node 22 + dotenv v17 ESM loader causes OOM; `.cjs` format avoids this
 - **Hybrid search + RRF** — combines semantic (vector) and lexical (BM25) search for better recall
 - **SSE streaming** — real-time token-by-token response delivery via Server-Sent Events
-- **DuckDNS** — free dynamic DNS for the EC2 instance domain
+- **Node.js runtime, not Edge** — SSE streaming works on Vercel's default Node runtime; Edge would only add API restrictions
 - **Cost comes from the provider** — a local rate table drifts silently: this one carried DeepSeek V3 prices long after the same slug had been repriced, understating every cost figure by ~3x. `usage.cost` is read from the response and the table is only a fallback, with unknown models charged at the highest known rate so a gap overstates rather than hides
 - **Reasoning disabled on the generator** — DeepSeek V4 is a reasoning model; left on it streams `delta.reasoning` chunks the reader drops, showing the user an empty box while still billing those tokens as completion. Grounded RAG answers do not need a reasoning pass
 - **The judge is never the generator** — a model asked to score its own output grades it generously; the judge runs a separate model family, behind a fallback chain because free slugs get retired without notice
